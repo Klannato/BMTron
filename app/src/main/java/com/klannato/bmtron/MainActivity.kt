@@ -37,6 +37,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val holder: SurfaceHolder = getHolder()
     private var thread: Thread? = null
     @Volatile private var running = false
+    private val lock = Any()
 
     private var screenWidth = 0
     private var screenHeight = 0
@@ -79,6 +80,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val labelPaint = Paint().apply { color = Color.CYAN; textSize = 24f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val label2Paint = Paint().apply { color = Color.MAGENTA; textSize = 24f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val scorePaint = Paint().apply { color = Color.WHITE; textSize = 48f; isAntiAlias = true; textAlign = Paint.Align.CENTER; isFakeBoldText = true }
+    private val gameOverPaint = Paint().apply { color = Color.WHITE; textSize = 48f; isAntiAlias = true; textAlign = Paint.Align.CENTER; isFakeBoldText = true }
 
     private var p1UpPressed = false
     private var p1DownPressed = false
@@ -120,37 +122,40 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         running = false
         try {
-            thread?.join(1000)
+            thread?.join(2000)
         } catch (e: InterruptedException) {
             // ignore
         }
+        thread = null
     }
 
     private fun resetGame() {
-        p1x = screenWidth / 2f
-        p1y = playFieldTop + (playFieldBottom - playFieldTop) * 0.15f
-        p1dx = 0f
-        p1dy = 1f
-        p1Trail.clear()
-        p1Alive = true
+        synchronized(lock) {
+            p1x = screenWidth / 2f
+            p1y = playFieldTop + (playFieldBottom - playFieldTop) * 0.15f
+            p1dx = 0f
+            p1dy = 1f
+            p1Trail.clear()
+            p1Alive = true
 
-        p2x = screenWidth / 2f
-        p2y = playFieldBottom - (playFieldBottom - playFieldTop) * 0.15f
-        p2dx = 0f
-        p2dy = -1f
-        p2Trail.clear()
-        p2Alive = true
+            p2x = screenWidth / 2f
+            p2y = playFieldBottom - (playFieldBottom - playFieldTop) * 0.15f
+            p2dx = 0f
+            p2dy = -1f
+            p2Trail.clear()
+            p2Alive = true
 
-        p1UpPressed = false
-        p1DownPressed = false
-        p1LeftPressed = false
-        p1RightPressed = false
-        p2UpPressed = false
-        p2DownPressed = false
-        p2LeftPressed = false
-        p2RightPressed = false
+            p1UpPressed = false
+            p1DownPressed = false
+            p1LeftPressed = false
+            p1RightPressed = false
+            p2UpPressed = false
+            p2DownPressed = false
+            p2LeftPressed = false
+            p2RightPressed = false
 
-        gameState = STATE_PLAYING
+            gameState = STATE_PLAYING
+        }
     }
 
     override fun run() {
@@ -162,7 +167,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 draw()
                 Thread.sleep(16)
             } catch (e: InterruptedException) {
-                // ignore
+                running = false
             } catch (e: Exception) {
                 // prevent crash from killing thread
             }
@@ -171,104 +176,106 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     private fun update() {
         try {
-            if (p1Alive) {
-                var desiredDx = p1dx
-                var desiredDy = p1dy
-                if (p1UpPressed) { desiredDx = 0f; desiredDy = -1f }
-                if (p1DownPressed) { desiredDx = 0f; desiredDy = 1f }
-                if (p1LeftPressed) { desiredDx = -1f; desiredDy = 0f }
-                if (p1RightPressed) { desiredDx = 1f; desiredDy = 0f }
-
-                if (desiredDx != p1dx || desiredDy != p1dy) {
-                    if (desiredDx == -p1dx && desiredDy == -p1dy) {
-                        // block reversal
-                    } else {
-                        p1dx = desiredDx
-                        p1dy = desiredDy
-                    }
-                }
-
-                p1Trail.add(Pair(p1x, p1y))
-                if (p1Trail.size > maxTrailSize) p1Trail.removeAt(0)
-                p1x += p1dx * SPEED
-                p1y += p1dy * SPEED
-
-                if (p1x < 0 || p1x > screenWidth || p1y < playFieldTop || p1y > playFieldBottom) {
-                    p1Alive = false
-                }
-
+            synchronized(lock) {
                 if (p1Alive) {
-                    val sz = p1Trail.size
-                    for (i in 0 until sz - 5) {
-                        val (tx, ty) = p1Trail[i]
-                        if (abs(p1x - tx) < trailWidth && abs(p1y - ty) < trailWidth) {
-                            p1Alive = false
-                            break
+                    var desiredDx = p1dx
+                    var desiredDy = p1dy
+                    if (p1UpPressed) { desiredDx = 0f; desiredDy = -1f }
+                    if (p1DownPressed) { desiredDx = 0f; desiredDy = 1f }
+                    if (p1LeftPressed) { desiredDx = -1f; desiredDy = 0f }
+                    if (p1RightPressed) { desiredDx = 1f; desiredDy = 0f }
+
+                    if (desiredDx != p1dx || desiredDy != p1dy) {
+                        if (desiredDx == -p1dx && desiredDy == -p1dy) {
+                            // block reversal
+                        } else {
+                            p1dx = desiredDx
+                            p1dy = desiredDy
                         }
                     }
-                }
 
-                if (p1Alive) {
-                    for ((tx, ty) in p2Trail) {
-                        if (abs(p1x - tx) < trailWidth && abs(p1y - ty) < trailWidth) {
-                            p1Alive = false
-                            break
+                    p1Trail.add(Pair(p1x, p1y))
+                    if (p1Trail.size > maxTrailSize) p1Trail.removeAt(0)
+                    p1x += p1dx * SPEED
+                    p1y += p1dy * SPEED
+
+                    if (p1x < 0 || p1x > screenWidth || p1y < playFieldTop || p1y > playFieldBottom) {
+                        p1Alive = false
+                    }
+
+                    if (p1Alive) {
+                        val sz = p1Trail.size
+                        for (i in 0 until sz - 5) {
+                            val (tx, ty) = p1Trail[i]
+                            if (abs(p1x - tx) < trailWidth && abs(p1y - ty) < trailWidth) {
+                                p1Alive = false
+                                break
+                            }
                         }
                     }
-                }
-            }
 
-            if (p2Alive) {
-                var desiredDx = p2dx
-                var desiredDy = p2dy
-                if (p2UpPressed) { desiredDx = 0f; desiredDy = -1f }
-                if (p2DownPressed) { desiredDx = 0f; desiredDy = 1f }
-                if (p2LeftPressed) { desiredDx = -1f; desiredDy = 0f }
-                if (p2RightPressed) { desiredDx = 1f; desiredDy = 0f }
-
-                if (desiredDx != p2dx || desiredDy != p2dy) {
-                    if (desiredDx == -p2dx && desiredDy == -p2dy) {
-                        // block reversal
-                    } else {
-                        p2dx = desiredDx
-                        p2dy = desiredDy
-                    }
-                }
-
-                p2Trail.add(Pair(p2x, p2y))
-                if (p2Trail.size > maxTrailSize) p2Trail.removeAt(0)
-                p2x += p2dx * SPEED
-                p2y += p2dy * SPEED
-
-                if (p2x < 0 || p2x > screenWidth || p2y < playFieldTop || p2y > playFieldBottom) {
-                    p2Alive = false
-                }
-
-                if (p2Alive) {
-                    val sz = p2Trail.size
-                    for (i in 0 until sz - 5) {
-                        val (tx, ty) = p2Trail[i]
-                        if (abs(p2x - tx) < trailWidth && abs(p2y - ty) < trailWidth) {
-                            p2Alive = false
-                            break
+                    if (p1Alive) {
+                        for ((tx, ty) in p2Trail) {
+                            if (abs(p1x - tx) < trailWidth && abs(p1y - ty) < trailWidth) {
+                                p1Alive = false
+                                break
+                            }
                         }
                     }
                 }
 
                 if (p2Alive) {
-                    for ((tx, ty) in p1Trail) {
-                        if (abs(p2x - tx) < trailWidth && abs(p2y - ty) < trailWidth) {
-                            p2Alive = false
-                            break
+                    var desiredDx = p2dx
+                    var desiredDy = p2dy
+                    if (p2UpPressed) { desiredDx = 0f; desiredDy = -1f }
+                    if (p2DownPressed) { desiredDx = 0f; desiredDy = 1f }
+                    if (p2LeftPressed) { desiredDx = -1f; desiredDy = 0f }
+                    if (p2RightPressed) { desiredDx = 1f; desiredDy = 0f }
+
+                    if (desiredDx != p2dx || desiredDy != p2dy) {
+                        if (desiredDx == -p2dx && desiredDy == -p2dy) {
+                            // block reversal
+                        } else {
+                            p2dx = desiredDx
+                            p2dy = desiredDy
+                        }
+                    }
+
+                    p2Trail.add(Pair(p2x, p2y))
+                    if (p2Trail.size > maxTrailSize) p2Trail.removeAt(0)
+                    p2x += p2dx * SPEED
+                    p2y += p2dy * SPEED
+
+                    if (p2x < 0 || p2x > screenWidth || p2y < playFieldTop || p2y > playFieldBottom) {
+                        p2Alive = false
+                    }
+
+                    if (p2Alive) {
+                        val sz = p2Trail.size
+                        for (i in 0 until sz - 5) {
+                            val (tx, ty) = p2Trail[i]
+                            if (abs(p2x - tx) < trailWidth && abs(p2y - ty) < trailWidth) {
+                                p2Alive = false
+                                break
+                            }
+                        }
+                    }
+
+                    if (p2Alive) {
+                        for ((tx, ty) in p1Trail) {
+                            if (abs(p2x - tx) < trailWidth && abs(p2y - ty) < trailWidth) {
+                                p2Alive = false
+                                break
+                            }
                         }
                     }
                 }
-            }
 
-            if (!p1Alive || !p2Alive) {
-                if (!p1Alive && p2Alive) score2++
-                else if (p1Alive && !p2Alive) score1++
-                gameState = STATE_GAME_OVER
+                if (!p1Alive || !p2Alive) {
+                    if (!p1Alive && p2Alive) score2++
+                    else if (p1Alive && !p2Alive) score1++
+                    gameState = STATE_GAME_OVER
+                }
             }
         } catch (e: Exception) {
             // Prevent crash
@@ -276,80 +283,91 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     private fun draw() {
+        var canvas: Canvas? = null
         try {
-            val canvas = holder.lockCanvas() ?: return
-            canvas.drawPaint(bgPaint)
+            canvas = holder.lockCanvas() ?: return
+            synchronized(lock) {
+                canvas.drawPaint(bgPaint)
 
-            // Draw triangular buttons filling each control zone
-            val cx = screenWidth / 2f
-            val cyTop = controlZoneHeight / 2f
-            val cyBot = screenHeight - controlZoneHeight / 2f
+                // Draw triangular buttons filling each control zone
+                val cx = screenWidth / 2f
+                val cyTop = controlZoneHeight / 2f
+                val cyBot = screenHeight - controlZoneHeight / 2f
 
-            // Top zone: 4 triangles meeting at center
-            drawTriangle(canvas, 0f, 0f, cx, cyTop, screenWidth.toFloat(), 0f, p1UpPressed, "▲", cx, controlZoneHeight * 0.25f)
-            drawTriangle(canvas, 0f, 0f, 0f, controlZoneHeight.toFloat(), cx, cyTop, p1LeftPressed, "◄", screenWidth * 0.12f, cyTop)
-            drawTriangle(canvas, screenWidth.toFloat(), 0f, cx, cyTop, screenWidth.toFloat(), controlZoneHeight.toFloat(), p1RightPressed, "►", screenWidth * 0.88f, cyTop)
-            drawTriangle(canvas, 0f, controlZoneHeight.toFloat(), cx, cyTop, screenWidth.toFloat(), controlZoneHeight.toFloat(), p1DownPressed, "▼", cx, controlZoneHeight * 0.75f)
+                // Top zone: 4 triangles meeting at center
+                drawTriangle(canvas, 0f, 0f, cx, cyTop, screenWidth.toFloat(), 0f, p1UpPressed, "▲", cx, controlZoneHeight * 0.25f)
+                drawTriangle(canvas, 0f, 0f, 0f, controlZoneHeight.toFloat(), cx, cyTop, p1LeftPressed, "◄", screenWidth * 0.12f, cyTop)
+                drawTriangle(canvas, screenWidth.toFloat(), 0f, cx, cyTop, screenWidth.toFloat(), controlZoneHeight.toFloat(), p1RightPressed, "►", screenWidth * 0.88f, cyTop)
+                drawTriangle(canvas, 0f, controlZoneHeight.toFloat(), cx, cyTop, screenWidth.toFloat(), controlZoneHeight.toFloat(), p1DownPressed, "▼", cx, controlZoneHeight * 0.75f)
 
-            // Bottom zone
-            drawTriangle(canvas, 0f, playFieldBottom, cx, cyBot, screenWidth.toFloat(), playFieldBottom, p2UpPressed, "▲", cx, playFieldBottom + controlZoneHeight * 0.25f)
-            drawTriangle(canvas, 0f, playFieldBottom, 0f, screenHeight.toFloat(), cx, cyBot, p2LeftPressed, "◄", screenWidth * 0.12f, cyBot)
-            drawTriangle(canvas, screenWidth.toFloat(), playFieldBottom, cx, cyBot, screenWidth.toFloat(), screenHeight.toFloat(), p2RightPressed, "►", screenWidth * 0.88f, cyBot)
-            drawTriangle(canvas, 0f, screenHeight.toFloat(), cx, cyBot, screenWidth.toFloat(), screenHeight.toFloat(), p2DownPressed, "▼", cx, playFieldBottom + controlZoneHeight * 0.75f)
+                // Bottom zone
+                drawTriangle(canvas, 0f, playFieldBottom, cx, cyBot, screenWidth.toFloat(), playFieldBottom, p2UpPressed, "▲", cx, playFieldBottom + controlZoneHeight * 0.25f)
+                drawTriangle(canvas, 0f, playFieldBottom, 0f, screenHeight.toFloat(), cx, cyBot, p2LeftPressed, "◄", screenWidth * 0.12f, cyBot)
+                drawTriangle(canvas, screenWidth.toFloat(), playFieldBottom, cx, cyBot, screenWidth.toFloat(), screenHeight.toFloat(), p2RightPressed, "►", screenWidth * 0.88f, cyBot)
+                drawTriangle(canvas, 0f, screenHeight.toFloat(), cx, cyBot, screenWidth.toFloat(), screenHeight.toFloat(), p2DownPressed, "▼", cx, playFieldBottom + controlZoneHeight * 0.75f)
 
-            // Borders between triangles
-            canvas.drawLine(0f, 0f, cx, cyTop, controlBorderPaint)
-            canvas.drawLine(screenWidth.toFloat(), 0f, cx, cyTop, controlBorderPaint)
-            canvas.drawLine(0f, controlZoneHeight.toFloat(), cx, cyTop, controlBorderPaint)
-            canvas.drawLine(screenWidth.toFloat(), controlZoneHeight.toFloat(), cx, cyTop, controlBorderPaint)
+                // Borders between triangles
+                canvas.drawLine(0f, 0f, cx, cyTop, controlBorderPaint)
+                canvas.drawLine(screenWidth.toFloat(), 0f, cx, cyTop, controlBorderPaint)
+                canvas.drawLine(0f, controlZoneHeight.toFloat(), cx, cyTop, controlBorderPaint)
+                canvas.drawLine(screenWidth.toFloat(), controlZoneHeight.toFloat(), cx, cyTop, controlBorderPaint)
 
-            canvas.drawLine(0f, playFieldBottom, cx, cyBot, controlBorderPaint)
-            canvas.drawLine(screenWidth.toFloat(), playFieldBottom, cx, cyBot, controlBorderPaint)
-            canvas.drawLine(0f, screenHeight.toFloat(), cx, cyBot, controlBorderPaint)
-            canvas.drawLine(screenWidth.toFloat(), screenHeight.toFloat(), cx, cyBot, controlBorderPaint)
+                canvas.drawLine(0f, playFieldBottom, cx, cyBot, controlBorderPaint)
+                canvas.drawLine(screenWidth.toFloat(), playFieldBottom, cx, cyBot, controlBorderPaint)
+                canvas.drawLine(0f, screenHeight.toFloat(), cx, cyBot, controlBorderPaint)
+                canvas.drawLine(screenWidth.toFloat(), screenHeight.toFloat(), cx, cyBot, controlBorderPaint)
 
-            // Score boards - top facing P1 (normal), bottom facing P2 (rotated 180)
-            canvas.drawText("P1: $score1", screenWidth / 2f, controlZoneHeight * 0.55f, scorePaint)
+                // Score boards - top facing P1 (normal), bottom facing P2 (rotated 180)
+                canvas.drawText("P1: $score1", screenWidth / 2f, controlZoneHeight * 0.55f, scorePaint)
 
-            canvas.save()
-            canvas.rotate(180f, screenWidth / 2f, screenHeight - controlZoneHeight * 0.55f)
-            canvas.drawText("P2: $score2", screenWidth / 2f, screenHeight - controlZoneHeight * 0.55f, scorePaint)
-            canvas.restore()
+                canvas.save()
+                canvas.rotate(180f, screenWidth / 2f, screenHeight - controlZoneHeight * 0.55f)
+                canvas.drawText("P2: $score2", screenWidth / 2f, screenHeight - controlZoneHeight * 0.55f, scorePaint)
+                canvas.restore()
 
-            canvas.drawText("P1", screenWidth / 2f, controlZoneHeight * 0.2f, labelPaint)
-            canvas.drawText("P2", screenWidth / 2f, screenHeight - controlZoneHeight * 0.2f, label2Paint)
+                canvas.drawText("P1", screenWidth / 2f, controlZoneHeight * 0.2f, labelPaint)
+                canvas.drawText("P2", screenWidth / 2f, screenHeight - controlZoneHeight * 0.2f, label2Paint)
 
-            // Play field
-            canvas.drawRect(0f, playFieldTop, screenWidth.toFloat(), playFieldBottom, bgPaint)
+                // Play field
+                canvas.drawRect(0f, playFieldTop, screenWidth.toFloat(), playFieldBottom, bgPaint)
 
-            // Draw trails
-            val p1TrailSize = p1Trail.size
-            for (i in 1 until p1TrailSize) {
-                val (x1, y1) = p1Trail[i - 1]
-                val (x2, y2) = p1Trail[i]
-                canvas.drawLine(x1, y1, x2, y2, p1Paint.apply { strokeWidth = trailWidth })
+                // Draw trails
+                val p1TrailSize = p1Trail.size
+                for (i in 1 until p1TrailSize) {
+                    val (x1, y1) = p1Trail[i - 1]
+                    val (x2, y2) = p1Trail[i]
+                    canvas.drawLine(x1, y1, x2, y2, p1Paint.apply { strokeWidth = trailWidth })
+                }
+
+                val p2TrailSize = p2Trail.size
+                for (i in 1 until p2TrailSize) {
+                    val (x1, y1) = p2Trail[i - 1]
+                    val (x2, y2) = p2Trail[i]
+                    canvas.drawLine(x1, y1, x2, y2, p2Paint.apply { strokeWidth = trailWidth })
+                }
+
+                if (p1Alive) canvas.drawCircle(p1x, p1y, playerRadius, p1Paint)
+                if (p2Alive) canvas.drawCircle(p2x, p2y, playerRadius, p2Paint)
+
+                if (gameState == STATE_GAME_OVER) {
+                    // Game over text on right side (rotated 90)
+                    canvas.save()
+                    canvas.rotate(90f, screenWidth * 0.85f, (playFieldTop + playFieldBottom) / 2f)
+                    canvas.drawText("GAME OVER", screenWidth * 0.85f, (playFieldTop + playFieldBottom) / 2f, gameOverPaint)
+                    canvas.restore()
+                    val restartPaint = Paint().apply { color = Color.GRAY; textSize = 24f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
+                    canvas.save()
+                    canvas.rotate(90f, screenWidth * 0.85f, (playFieldTop + playFieldBottom) / 2f + 60f)
+                    canvas.drawText("Tap to restart", screenWidth * 0.85f, (playFieldTop + playFieldBottom) / 2f + 60f, restartPaint)
+                    canvas.restore()
+                }
             }
-
-            val p2TrailSize = p2Trail.size
-            for (i in 1 until p2TrailSize) {
-                val (x1, y1) = p2Trail[i - 1]
-                val (x2, y2) = p2Trail[i]
-                canvas.drawLine(x1, y1, x2, y2, p2Paint.apply { strokeWidth = trailWidth })
-            }
-
-            if (p1Alive) canvas.drawCircle(p1x, p1y, playerRadius, p1Paint)
-            if (p2Alive) canvas.drawCircle(p2x, p2y, playerRadius, p2Paint)
-
-            if (gameState == STATE_GAME_OVER) {
-                val gameOverPaint = Paint().apply { color = Color.WHITE; textSize = 64f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
-                canvas.drawText("GAME OVER", screenWidth / 2f, (playFieldTop + playFieldBottom) / 2f, gameOverPaint)
-                val restartPaint = Paint().apply { color = Color.GRAY; textSize = 32f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
-                canvas.drawText("Tap anywhere to restart", screenWidth / 2f, (playFieldTop + playFieldBottom) / 2f + 60f, restartPaint)
-            }
-
             holder.unlockCanvasAndPost(canvas)
         } catch (e: Exception) {
             // Prevent crash
+            canvas?.let {
+                try { holder.unlockCanvasAndPost(it) } catch (e2: Exception) { }
+            }
         }
     }
 
@@ -432,7 +450,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     fun pause() {
         running = false
         try {
-            thread?.join(1000)
+            thread?.join(2000)
         } catch (e: InterruptedException) {
             // ignore
         }
