@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.os.Bundle
 import android.view.MotionEvent
@@ -73,20 +74,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val dividerPaint = Paint().apply { color = Color.DKGRAY; strokeWidth = 2f }
     private val controlBgPaint = Paint().apply { color = Color.rgb(30, 30, 30) }
     private val controlBorderPaint = Paint().apply { color = Color.rgb(80, 80, 80); style = Paint.Style.STROKE; strokeWidth = 2f }
-    private val controlTextPaint = Paint().apply { color = Color.WHITE; textSize = 28f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
+    private val controlTextPaint = Paint().apply { color = Color.WHITE; textSize = 32f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val activeControlPaint = Paint().apply { color = Color.rgb(60, 60, 60) }
     private val labelPaint = Paint().apply { color = Color.CYAN; textSize = 24f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val label2Paint = Paint().apply { color = Color.MAGENTA; textSize = 24f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
-
-    // 4 direction buttons per player: Up, Down, Left, Right
-    private var p1UpBtn = RectF()
-    private var p1DownBtn = RectF()
-    private var p1LeftBtn = RectF()
-    private var p1RightBtn = RectF()
-    private var p2UpBtn = RectF()
-    private var p2DownBtn = RectF()
-    private var p2LeftBtn = RectF()
-    private var p2RightBtn = RectF()
 
     private var p1UpPressed = false
     private var p1DownPressed = false
@@ -110,24 +101,9 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     override fun surfaceCreated(holder: SurfaceHolder) {
         screenWidth = width
         screenHeight = height
-        controlZoneHeight = (screenHeight * 0.10f).toInt()
+        controlZoneHeight = (screenHeight * 0.15f).toInt()
         playFieldTop = controlZoneHeight.toFloat()
         playFieldBottom = screenHeight - controlZoneHeight.toFloat()
-
-        val btnSize = controlZoneHeight * 0.75f
-        val gap = (screenWidth - btnSize * 4) / 5f
-        val btnY1 = controlZoneHeight * 0.125f
-
-        p1UpBtn = RectF(gap, btnY1, gap + btnSize, btnY1 + btnSize)
-        p1DownBtn = RectF(gap * 2 + btnSize, btnY1, gap * 2 + btnSize * 2, btnY1 + btnSize)
-        p1LeftBtn = RectF(gap * 3 + btnSize * 2, btnY1, gap * 3 + btnSize * 3, btnY1 + btnSize)
-        p1RightBtn = RectF(gap * 4 + btnSize * 3, btnY1, gap * 4 + btnSize * 4, btnY1 + btnSize)
-
-        val baseY = screenHeight - controlZoneHeight + controlZoneHeight * 0.125f
-        p2UpBtn = RectF(gap, baseY, gap + btnSize, baseY + btnSize)
-        p2DownBtn = RectF(gap * 2 + btnSize, baseY, gap * 2 + btnSize * 2, baseY + btnSize)
-        p2LeftBtn = RectF(gap * 3 + btnSize * 2, baseY, gap * 3 + btnSize * 3, baseY + btnSize)
-        p2RightBtn = RectF(gap * 4 + btnSize * 3, baseY, gap * 4 + btnSize * 4, baseY + btnSize)
 
         resetGame()
         running = true
@@ -195,7 +171,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private fun update() {
         try {
             if (p1Alive) {
-                // Determine desired direction from pressed buttons
                 var desiredDx = p1dx
                 var desiredDy = p1dy
                 if (p1UpPressed) { desiredDx = 0f; desiredDy = -1f }
@@ -203,7 +178,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 if (p1LeftPressed) { desiredDx = -1f; desiredDy = 0f }
                 if (p1RightPressed) { desiredDx = 1f; desiredDy = 0f }
 
-                // Apply if not a 180-degree reversal
                 if (desiredDx != p1dx || desiredDy != p1dy) {
                     if (desiredDx == -p1dx && desiredDy == -p1dy) {
                         // block reversal
@@ -296,7 +270,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 gameState = STATE_GAME_OVER
             }
         } catch (e: Exception) {
-            // Prevent crash from killing thread
+            // Prevent crash
         }
     }
 
@@ -305,26 +279,39 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             val canvas = holder.lockCanvas() ?: return
             canvas.drawPaint(bgPaint)
 
-            canvas.drawRect(0f, 0f, screenWidth.toFloat(), playFieldTop, controlBgPaint)
-            canvas.drawRect(0f, playFieldBottom, screenWidth.toFloat(), screenHeight.toFloat(), controlBgPaint)
+            // Draw triangular buttons filling each control zone
+            val cx = screenWidth / 2f
+            val cyTop = controlZoneHeight / 2f
+            val cyBot = screenHeight - controlZoneHeight / 2f
 
-            canvas.drawLine(0f, playFieldTop, screenWidth.toFloat(), playFieldTop, dividerPaint)
-            canvas.drawLine(0f, playFieldBottom, screenWidth.toFloat(), playFieldBottom, dividerPaint)
+            // Top zone: 4 triangles meeting at center
+            drawTriangle(canvas, 0f, 0f, cx, cyTop, screenWidth.toFloat(), 0f, p1UpPressed, "▲", cx, controlZoneHeight * 0.25f)
+            drawTriangle(canvas, 0f, 0f, 0f, controlZoneHeight.toFloat(), cx, cyTop, p1LeftPressed, "◄", screenWidth * 0.12f, cyTop)
+            drawTriangle(canvas, screenWidth.toFloat(), 0f, cx, cyTop, screenWidth.toFloat(), controlZoneHeight.toFloat(), p1RightPressed, "►", screenWidth * 0.88f, cyTop)
+            drawTriangle(canvas, 0f, controlZoneHeight.toFloat(), cx, cyTop, screenWidth.toFloat(), controlZoneHeight.toFloat(), p1DownPressed, "▼", cx, controlZoneHeight * 0.75f)
 
-            // P1 control buttons: Up/Down left, Left/Right right
-            drawButton(canvas, p1UpBtn, "▲", p1UpPressed)
-            drawButton(canvas, p1DownBtn, "▼", p1DownPressed)
-            drawButton(canvas, p1LeftBtn, "◄", p1LeftPressed)
-            drawButton(canvas, p1RightBtn, "►", p1RightPressed)
+            // Bottom zone
+            drawTriangle(canvas, 0f, playFieldBottom, cx, cyBot, screenWidth.toFloat(), playFieldBottom, p2UpPressed, "▲", cx, playFieldBottom + controlZoneHeight * 0.25f)
+            drawTriangle(canvas, 0f, playFieldBottom, 0f, screenHeight.toFloat(), cx, cyBot, p2LeftPressed, "◄", screenWidth * 0.12f, cyBot)
+            drawTriangle(canvas, screenWidth.toFloat(), playFieldBottom, cx, cyBot, screenWidth.toFloat(), screenHeight.toFloat(), p2RightPressed, "►", screenWidth * 0.88f, cyBot)
+            drawTriangle(canvas, 0f, screenHeight.toFloat(), cx, cyBot, screenWidth.toFloat(), screenHeight.toFloat(), p2DownPressed, "▼", cx, playFieldBottom + controlZoneHeight * 0.75f)
 
-            // P2 control buttons
-            drawButton(canvas, p2UpBtn, "▲", p2UpPressed)
-            drawButton(canvas, p2DownBtn, "▼", p2DownPressed)
-            drawButton(canvas, p2LeftBtn, "◄", p2LeftPressed)
-            drawButton(canvas, p2RightBtn, "►", p2RightPressed)
+            // Borders between triangles
+            canvas.drawLine(0f, 0f, cx, cyTop, controlBorderPaint)
+            canvas.drawLine(screenWidth.toFloat(), 0f, cx, cyTop, controlBorderPaint)
+            canvas.drawLine(0f, controlZoneHeight.toFloat(), cx, cyTop, controlBorderPaint)
+            canvas.drawLine(screenWidth.toFloat(), controlZoneHeight.toFloat(), cx, cyTop, controlBorderPaint)
+
+            canvas.drawLine(0f, playFieldBottom, cx, cyBot, controlBorderPaint)
+            canvas.drawLine(screenWidth.toFloat(), playFieldBottom, cx, cyBot, controlBorderPaint)
+            canvas.drawLine(0f, screenHeight.toFloat(), cx, cyBot, controlBorderPaint)
+            canvas.drawLine(screenWidth.toFloat(), screenHeight.toFloat(), cx, cyBot, controlBorderPaint)
 
             canvas.drawText("P1", screenWidth / 2f, controlZoneHeight * 0.5f + 8f, labelPaint)
             canvas.drawText("P2", screenWidth / 2f, screenHeight - controlZoneHeight * 0.5f + 8f, label2Paint)
+
+            // Play field
+            canvas.drawRect(0f, playFieldTop, screenWidth.toFloat(), playFieldBottom, bgPaint)
 
             // Draw trails
             val p1TrailSize = p1Trail.size
@@ -360,11 +347,24 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         }
     }
 
-    private fun drawButton(canvas: Canvas, rect: RectF, label: String, pressed: Boolean) {
+    private fun drawTriangle(canvas: Canvas, x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float, pressed: Boolean, label: String, lx: Float, ly: Float) {
+        val path = Path()
+        path.moveTo(x1, y1)
+        path.lineTo(x2, y2)
+        path.lineTo(x3, y3)
+        path.close()
         val paint = if (pressed) activeControlPaint else controlBgPaint
-        canvas.drawRoundRect(rect, 12f, 12f, paint)
-        canvas.drawRoundRect(rect, 12f, 12f, controlBorderPaint)
-        canvas.drawText(label, rect.centerX(), rect.centerY() + 10f, controlTextPaint)
+        canvas.drawPath(path, paint)
+        canvas.drawText(label, lx, ly + 10f, controlTextPaint)
+    }
+
+    private fun pointInTriangle(px: Float, py: Float, x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float): Boolean {
+        val d1 = (px - x2) * (y1 - y2) + (py - y2) * (x2 - x1)
+        val d2 = (px - x3) * (y2 - y3) + (py - y3) * (x3 - x2)
+        val d3 = (px - x1) * (y3 - y1) + (py - y1) * (x1 - x3)
+        val hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0)
+        val hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0)
+        return !(hasNeg && hasPos)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -378,15 +378,33 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                     val x = event.x
                     val y = event.y
 
-                    p1UpPressed = p1UpBtn.contains(x, y)
-                    p1DownPressed = p1DownBtn.contains(x, y)
-                    p1LeftPressed = p1LeftBtn.contains(x, y)
-                    p1RightPressed = p1RightBtn.contains(x, y)
+                    if (y <= controlZoneHeight) {
+                        val cx = screenWidth / 2f
+                        val cy = controlZoneHeight / 2f
+                        p1UpPressed = pointInTriangle(x, y, 0f, 0f, cx, cy, screenWidth.toFloat(), 0f)
+                        p1LeftPressed = pointInTriangle(x, y, 0f, 0f, 0f, controlZoneHeight.toFloat(), cx, cy)
+                        p1RightPressed = pointInTriangle(x, y, screenWidth.toFloat(), 0f, cx, cy, screenWidth.toFloat(), controlZoneHeight.toFloat())
+                        p1DownPressed = pointInTriangle(x, y, 0f, controlZoneHeight.toFloat(), cx, cy, screenWidth.toFloat(), controlZoneHeight.toFloat())
+                    } else {
+                        p1UpPressed = false
+                        p1DownPressed = false
+                        p1LeftPressed = false
+                        p1RightPressed = false
+                    }
 
-                    p2UpPressed = p2UpBtn.contains(x, y)
-                    p2DownPressed = p2DownBtn.contains(x, y)
-                    p2LeftPressed = p2LeftBtn.contains(x, y)
-                    p2RightPressed = p2RightBtn.contains(x, y)
+                    if (y >= playFieldBottom) {
+                        val cx = screenWidth / 2f
+                        val cy = screenHeight - controlZoneHeight / 2f
+                        p2UpPressed = pointInTriangle(x, y, 0f, playFieldBottom, cx, cy, screenWidth.toFloat(), playFieldBottom)
+                        p2LeftPressed = pointInTriangle(x, y, 0f, playFieldBottom, 0f, screenHeight.toFloat(), cx, cy)
+                        p2RightPressed = pointInTriangle(x, y, screenWidth.toFloat(), playFieldBottom, cx, cy, screenWidth.toFloat(), screenHeight.toFloat())
+                        p2DownPressed = pointInTriangle(x, y, 0f, screenHeight.toFloat(), cx, cy, screenWidth.toFloat(), screenHeight.toFloat())
+                    } else {
+                        p2UpPressed = false
+                        p2DownPressed = false
+                        p2LeftPressed = false
+                        p2RightPressed = false
+                    }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     p1UpPressed = false
