@@ -110,28 +110,24 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     override fun surfaceCreated(holder: SurfaceHolder) {
         screenWidth = width
         screenHeight = height
-        controlZoneHeight = (screenHeight * 0.16f).toInt()
+        controlZoneHeight = (screenHeight * 0.10f).toInt()
         playFieldTop = controlZoneHeight.toFloat()
         playFieldBottom = screenHeight - controlZoneHeight.toFloat()
 
-        val btnSize = controlZoneHeight * 0.45f
-        val gap = controlZoneHeight * 0.08f
-        val row1Y = controlZoneHeight * 0.08f
-        val row2Y = row1Y + btnSize + gap
+        val btnSize = controlZoneHeight * 0.75f
+        val gap = (screenWidth - btnSize * 4) / 5f
+        val btnY1 = controlZoneHeight * 0.125f
 
-        // P1 controls: Up/Down on left, Left/Right on right
-        val leftX = screenWidth * 0.08f
-        val rightX = screenWidth * 0.92f - btnSize
-        p1UpBtn = RectF(leftX, row1Y, leftX + btnSize, row1Y + btnSize)
-        p1DownBtn = RectF(leftX, row2Y, leftX + btnSize, row2Y + btnSize)
-        p1LeftBtn = RectF(rightX, row1Y, rightX + btnSize, row1Y + btnSize)
-        p1RightBtn = RectF(rightX, row2Y, rightX + btnSize, row2Y + btnSize)
+        p1UpBtn = RectF(gap, btnY1, gap + btnSize, btnY1 + btnSize)
+        p1DownBtn = RectF(gap * 2 + btnSize, btnY1, gap * 2 + btnSize * 2, btnY1 + btnSize)
+        p1LeftBtn = RectF(gap * 3 + btnSize * 2, btnY1, gap * 3 + btnSize * 3, btnY1 + btnSize)
+        p1RightBtn = RectF(gap * 4 + btnSize * 3, btnY1, gap * 4 + btnSize * 4, btnY1 + btnSize)
 
-        val baseY = screenHeight - controlZoneHeight + controlZoneHeight * 0.08f
-        p2UpBtn = RectF(leftX, baseY, leftX + btnSize, baseY + btnSize)
-        p2DownBtn = RectF(leftX, baseY + btnSize + gap, leftX + btnSize, baseY + btnSize * 2 + gap)
-        p2LeftBtn = RectF(rightX, baseY, rightX + btnSize, baseY + btnSize)
-        p2RightBtn = RectF(rightX, baseY + btnSize + gap, rightX + btnSize, baseY + btnSize * 2 + gap)
+        val baseY = screenHeight - controlZoneHeight + controlZoneHeight * 0.125f
+        p2UpBtn = RectF(gap, baseY, gap + btnSize, baseY + btnSize)
+        p2DownBtn = RectF(gap * 2 + btnSize, baseY, gap * 2 + btnSize * 2, baseY + btnSize)
+        p2LeftBtn = RectF(gap * 3 + btnSize * 2, baseY, gap * 3 + btnSize * 3, baseY + btnSize)
+        p2RightBtn = RectF(gap * 4 + btnSize * 3, baseY, gap * 4 + btnSize * 4, baseY + btnSize)
 
         resetGame()
         running = true
