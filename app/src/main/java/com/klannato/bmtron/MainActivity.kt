@@ -78,6 +78,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val activeControlPaint = Paint().apply { color = Color.rgb(60, 60, 60) }
     private val labelPaint = Paint().apply { color = Color.CYAN; textSize = 24f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val label2Paint = Paint().apply { color = Color.MAGENTA; textSize = 24f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
+    private val scorePaint = Paint().apply { color = Color.WHITE; textSize = 48f; isAntiAlias = true; textAlign = Paint.Align.CENTER; isFakeBoldText = true }
 
     private var p1UpPressed = false
     private var p1DownPressed = false
@@ -307,8 +308,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
             canvas.drawLine(0f, screenHeight.toFloat(), cx, cyBot, controlBorderPaint)
             canvas.drawLine(screenWidth.toFloat(), screenHeight.toFloat(), cx, cyBot, controlBorderPaint)
 
-            canvas.drawText("P1", screenWidth / 2f, controlZoneHeight * 0.5f + 8f, labelPaint)
-            canvas.drawText("P2", screenWidth / 2f, screenHeight - controlZoneHeight * 0.5f + 8f, label2Paint)
+            // Score boards - top facing P1 (normal), bottom facing P2 (rotated 180)
+            canvas.drawText("P1: $score1", screenWidth / 2f, controlZoneHeight * 0.55f, scorePaint)
+
+            canvas.save()
+            canvas.rotate(180f, screenWidth / 2f, screenHeight - controlZoneHeight * 0.55f)
+            canvas.drawText("P2: $score2", screenWidth / 2f, screenHeight - controlZoneHeight * 0.55f, scorePaint)
+            canvas.restore()
+
+            canvas.drawText("P1", screenWidth / 2f, controlZoneHeight * 0.2f, labelPaint)
+            canvas.drawText("P2", screenWidth / 2f, screenHeight - controlZoneHeight * 0.2f, label2Paint)
 
             // Play field
             canvas.drawRect(0f, playFieldTop, screenWidth.toFloat(), playFieldBottom, bgPaint)
@@ -330,9 +339,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
             if (p1Alive) canvas.drawCircle(p1x, p1y, playerRadius, p1Paint)
             if (p2Alive) canvas.drawCircle(p2x, p2y, playerRadius, p2Paint)
-
-            canvas.drawText("P1: $score1", 20f, playFieldTop + 40f, textPaint)
-            canvas.drawText("P2: $score2", 20f, playFieldBottom - 20f, textPaint)
 
             if (gameState == STATE_GAME_OVER) {
                 val gameOverPaint = Paint().apply { color = Color.WHITE; textSize = 64f; isAntiAlias = true; textAlign = Paint.Align.CENTER }
